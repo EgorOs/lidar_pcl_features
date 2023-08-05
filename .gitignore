@@ -1,0 +1,12 @@
+.pytest_cache
+.ruff_cache
+.ipynb_checkpoints
+.virtual_documents
+
+# DS_Store (MacOS)
+.DS_Store
+
+__pycache__
+.idea
+.lsp_symlink
+.data_temp_dir
