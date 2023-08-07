@@ -12,7 +12,7 @@ from xgboost import XGBClassifier
 from src.annotations import Annotation
 from src.config import ExperimentConfig
 from src.features import LocalPCD
-from src.utils import encode_classes, read_class_mapping
+from src.utils import adjust_idx_to_class_mapping, read_class_mapping
 
 PROJ_ROOT = Path(os.getenv('PROJ_ROOT', Path(__file__).resolve().parents[1]))
 
@@ -35,12 +35,12 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
 
     training_features = []
-    training_classes, idx_to_class = encode_classes(raw_points[:, 3].astype(np.int32), idx_to_class)
     for pt3d in pcd.points:
         kn, idx, *_ = pcd_tree.search_radius_vector_3d(pt3d, 3)
         local_pcd = LocalPCD.from_pt_and_neighbours(pcd, pt3d, idx)
         training_features.append(local_pcd.features)
 
+    training_classes, idx_to_class = adjust_idx_to_class_mapping(raw_points[:, 3].astype(np.int32), idx_to_class)
     X_train, X_test, y_train, y_test = train_test_split(np.vstack(training_features), training_classes, test_size=0.2)
 
     bst = XGBClassifier(verbosity=3)

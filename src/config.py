@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class DataConfig(BaseModel):
     dataset_name: str = 'lidar_cvpr09'
     data_split: Tuple[float, ...] = (0.7, 0.2, 0.1)
+    drop_cache: bool = False
 
 
 class ExperimentConfig(BaseModel):

@@ -20,6 +20,8 @@ addict = ">=2.4.0"
 pandas = ">=2.0.3"
 tensorboard = ">=2.13.0"
 distinctipy = ">=1.2.2"
+tqdm = ">=4.65"
+imbalanced-learn = ">=0.11.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.2.1"
