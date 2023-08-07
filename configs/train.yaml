@@ -1,0 +1,8 @@
+project_name: lidar_pcl_features
+experiment_name: lidar_xgboost
+data_config:
+  dataset_name: lidar_cvpr09
+  data_split:
+  - 0.7
+  - 0.2
+  - 0.1
