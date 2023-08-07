@@ -4,4 +4,4 @@ from dataclasses import dataclass
 @dataclass
 class Annotation:
     class_name: str
-    color: str
+    color: tuple
