@@ -5,7 +5,7 @@ import lightning
 import numpy as np
 from clearml import OutputModel, Task
 from clearml.datasets import Dataset as ClearmlDataset
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.under_sampling import RandomUnderSampler
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils import class_weight
 from xgboost import XGBClassifier
@@ -14,7 +14,7 @@ from src.annotations import Annotation, read_class_mapping
 from src.config import ExperimentConfig
 from src.constants import PROJ_ROOT
 from src.dataset import TESTING_SET, TRAINING_SET, Dataset
-from src.experiment_tracking import log_point_cloud
+from src.experiment_tracking import visualize_scene
 
 
 def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
@@ -36,7 +36,7 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     train_features = dataset.get_features(TESTING_SET)  # Test / train are switched intentionally.
     train_classes = dataset.get_classes(TESTING_SET)
 
-    sampler = RandomOverSampler()
+    sampler = RandomUnderSampler()
     train_features, train_classes = sampler.fit_resample(train_features, train_classes)
     test_features = dataset.get_features(TRAINING_SET)
     test_classes = dataset.get_classes(TRAINING_SET)
@@ -63,14 +63,8 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     )
     task.logger.report_text(cls_report)
 
-    vis_scene = 'oakland_part3_an_training.xyz_label_conf'
-    vis_scene_points = dataset.get_scene_points(TRAINING_SET, vis_scene)
-    vis_scene_features = dataset.get_scene_features(TRAINING_SET, vis_scene)
-    vis_scene_classes = dataset.get_scene_classes(TRAINING_SET, vis_scene)
-    vis_pred_classes = bst.predict(vis_scene_features)
-
-    log_point_cloud(task, dataset, vis_scene_points, vis_pred_classes, 'Visualized predictions')
-    log_point_cloud(task, dataset, vis_scene_points, vis_scene_classes, 'Visualized ground truth')
+    visualize_scene(task, bst, dataset, TRAINING_SET, 'oakland_part3_an_training.xyz_label_conf')
+    visualize_scene(task, bst, dataset, TESTING_SET, 'oakland_part2_ac.xyz_label_conf')
 
     output_model = OutputModel(
         task=task,
