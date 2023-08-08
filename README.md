@@ -38,3 +38,22 @@ LiDAR point cloud segmentation with classic ML approaches.
 ```bash
 make run_training
 ```
+
+# Results
+
+🧪 [Experiment link](https://app.clear.ml/projects/27c1eb5330ef46d8a0e021fef065689e/experiments/1b7beb5bfdd84599b9e37d73d9dd58d7/output/execution)
+
+<img src=assets/results_1.png>
+<img src=assets/results_2.png>
+
+```bash
+              precision    recall  f1-score
+           0       0.52      0.73      0.61
+           1       0.99      0.85      0.91
+           2       0.35      0.50      0.41
+           3       0.89      0.94      0.91
+           4       0.45      0.25      0.32
+    accuracy                           0.82
+   macro avg       0.64      0.65      0.63
+weighted avg       0.83      0.82      0.82
+```
