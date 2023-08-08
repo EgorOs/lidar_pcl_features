@@ -110,5 +110,5 @@ class Dataset:
 
 
 def _post_process_features(features: NDArray[float]) -> NDArray[float]:
-    features = np.nan_to_num(features, posinf=1e8, neginf=-1e8)
-    return np.clip(features, -100, 100)
+    features = np.nan_to_num(features, posinf=1e12, neginf=-1e12)
+    return features

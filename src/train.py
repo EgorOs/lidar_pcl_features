@@ -1,55 +1,85 @@
-import os
 from pathlib import Path
 from typing import Dict
 
+import lightning
 import numpy as np
-import open3d as o3d
+from clearml import OutputModel, Task
 from clearml.datasets import Dataset as ClearmlDataset
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.utils import class_weight
 from xgboost import XGBClassifier
 
 from src.annotations import Annotation
 from src.config import ExperimentConfig
-from src.features import LocalPCD
-from src.utils import adjust_idx_to_class_mapping, read_class_mapping
-
-PROJ_ROOT = Path(os.getenv('PROJ_ROOT', Path(__file__).resolve().parents[1]))
-
-
-# class Workflow(lt.LightningWork):
-#     def run(self, *args: Any, **kwargs: Any) -> None:
-#         pass
+from src.constants import PROJ_ROOT
+from src.dataset import TESTING_SET, TRAINING_SET, Dataset
+from src.experiment_tracking import log_point_cloud
+from src.utils import read_class_mapping
 
 
 def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
+    lightning.seed_everything(0)
+    Task.force_requirements_env_freeze()  # or use task.set_packages() for more granular control.
+    task = Task.init(
+        project_name=cfg.project_name,
+        task_name=cfg.experiment_name,
+        # If `output_uri=True` uses default ClearML output URI,
+        # can use string value to specify custom storage URI like S3.
+        output_uri=True,
+    )
+    task.connect_configuration(configuration=cfg.model_dump())
+
     data_path = Path(ClearmlDataset.get(dataset_name=cfg.data_config.dataset_name).get_local_copy())
+    dataset = Dataset(data_path, idx_to_class, drop_cache=cfg.data_config.drop_cache)
+    dataset.prepare()
 
-    sample_path = data_path / 'testing' / 'oakland_part2_ac.xyz_label_conf'
+    train_features = dataset.get_features(TESTING_SET)  # Test / train are switched intentionally.
+    train_classes = dataset.get_classes(TESTING_SET)
 
-    raw_points = np.genfromtxt(sample_path, delimiter=' ')
-    # rgb_points = colorize_points(raw_points, idx_to_class)
+    sampler = RandomOverSampler()
+    train_features, train_classes = sampler.fit_resample(train_features, train_classes)
+    test_features = dataset.get_features(TRAINING_SET)
+    test_classes = dataset.get_classes(TRAINING_SET)
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(raw_points[:, :3])
-    pcd_tree = o3d.geometry.KDTreeFlann(pcd)
+    bst = XGBClassifier(verbosity=3, max_depth=6, n_estimators=100)
+    classes_weights = list(
+        class_weight.compute_class_weight('balanced', classes=np.unique(train_classes), y=train_classes),
+    )
+    bst.fit(train_features, train_classes, sample_weight=[classes_weights[cls] for cls in train_classes])
+    preds = bst.predict(test_features)
 
-    training_features = []
-    for pt3d in pcd.points:
-        kn, idx, *_ = pcd_tree.search_radius_vector_3d(pt3d, 3)
-        local_pcd = LocalPCD.from_pt_and_neighbours(pcd, pt3d, idx)
-        training_features.append(local_pcd.features)
+    cf_matrix = confusion_matrix(test_classes, preds)
+    cls_report = classification_report(test_classes, preds)
+    cf_labels = [dataset.idx_to_class_name[idx] for idx, _ in enumerate(cf_matrix)]
+    task.logger.report_confusion_matrix(
+        'Confusion matrix',
+        'ignored',
+        iteration=None,
+        matrix=cf_matrix,
+        xaxis=None,
+        yaxis=None,
+        xlabels=cf_labels,
+        ylabels=cf_labels,
+    )
+    task.logger.report_text(cls_report)
 
-    training_classes, idx_to_class = adjust_idx_to_class_mapping(raw_points[:, 3].astype(np.int32), idx_to_class)
-    X_train, X_test, y_train, y_test = train_test_split(np.vstack(training_features), training_classes, test_size=0.2)
+    vis_scene = 'oakland_part3_an_training.xyz_label_conf'
+    vis_scene_points = dataset.get_scene_points(TRAINING_SET, vis_scene)
+    vis_scene_features = dataset.get_scene_features(TRAINING_SET, vis_scene)
+    vis_scene_classes = dataset.get_scene_classes(TRAINING_SET, vis_scene)
+    vis_pred_classes = bst.predict(vis_scene_features)
 
-    bst = XGBClassifier(verbosity=3)
-    bst.fit(X_train, y_train)
-    preds = bst.predict(X_test)
-    print(f'preds: {preds}')
+    log_point_cloud(task, dataset, vis_scene_points, vis_pred_classes, 'Visualized predictions')
+    log_point_cloud(task, dataset, vis_scene_points, vis_scene_classes, 'Visualized ground truth')
 
-    cf_matrix = confusion_matrix(y_test, preds)
-    cls_report = classification_report(y_test, preds)
+    output_model = OutputModel(
+        task=task,
+        label_enumeration={name: idx for idx, name in dataset.idx_to_class_name.items()},
+    )
+    checkpoint_name = 'model.json'
+    bst.save_model(checkpoint_name)
+    output_model.update_weights(checkpoint_name)
 
 
 if __name__ == '__main__':

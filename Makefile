@@ -57,3 +57,6 @@ upload_dataset_to_clearml:
 	find $(DATASET_TEMP_DIR) -type f -name '.DS_Store' -delete
 	clearml-data add --files $(UNPACKED_DATASET_DIR)
 	clearml-data close
+
+run_training:
+	poetry run $(PYTHON_EXEC) -m src.train

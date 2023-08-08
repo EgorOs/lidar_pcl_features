@@ -32,3 +32,9 @@ LiDAR point cloud segmentation with classic ML approaches.
    ```bash
    make jupyterlab_start
    ```
+
+# Train
+
+```bash
+make run_training
+```
