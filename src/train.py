@@ -31,7 +31,7 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     task.connect_configuration(configuration=cfg.model_dump())
 
     data_path = Path(ClearmlDataset.get(dataset_name=cfg.data_config.dataset_name).get_local_copy())
-    dataset = Dataset(data_path, idx_to_class, drop_cache=cfg.data_config.drop_cache)
+    dataset = Dataset(data_path, idx_to_class, feature_scales=[3, 6], drop_cache=cfg.data_config.drop_cache)
     dataset.prepare()
 
     train_features = dataset.get_features(TESTING_SET)  # Test / train are switched intentionally.

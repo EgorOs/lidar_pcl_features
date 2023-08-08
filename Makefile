@@ -41,7 +41,6 @@ migrate_dataset:
 get_data:
 	mkdir -p $(UNPACKED_DATASET_DIR)
 
-	# Test and train switched intentionally
 	wget https://www.cs.cmu.edu/~vmr/datasets/oakland_3d/cvpr09/data/testing.zip -O $(DATASET_TEMP_DIR)/testing.zip
 	wget https://www.cs.cmu.edu/~vmr/datasets/oakland_3d/cvpr09/data/training.zip -O $(DATASET_TEMP_DIR)/training.zip
 	wget https://www.cs.cmu.edu/~vmr/datasets/oakland_3d/cvpr09/doc/filtering_mapping.txt -O $(UNPACKED_DATASET_DIR)/classes.txt

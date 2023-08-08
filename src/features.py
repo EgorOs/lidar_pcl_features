@@ -1,10 +1,10 @@
 import math
 from dataclasses import dataclass, field
 from functools import cached_property
+from typing import List
 
 import numpy as np
 import open3d as o3d
-from numpy._typing import NDArray
 from numpy.typing import NDArray
 from tqdm import tqdm
 
@@ -81,15 +81,16 @@ class LocalPCD:
         )
 
 
-def get_features(points_3d: NDArray[float]) -> NDArray[float]:
+def get_features(points_3d: NDArray[float], scale: float) -> NDArray[float]:
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points_3d[:, :3])
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
 
-    training_features = []
-    for pt3d in tqdm(pcd.points, desc='Calculating features for 3D points:'):
-        kn, idx, *_ = pcd_tree.search_radius_vector_3d(pt3d, 3)
+    features = []
+    # TODO: Use multiprocessing
+    for pt3d in tqdm(pcd.points, desc=f'Calculating features for 3D points at scale {scale}:'):
+        kn, idx, *_ = pcd_tree.search_radius_vector_3d(pt3d, scale)
         local_pcd = LocalPCD.from_pt_and_neighbours(pcd, pt3d, idx)
-        training_features.append(local_pcd.features)
+        features.append(local_pcd.features)
 
-    return np.vstack(training_features)
+    return np.vstack(features)

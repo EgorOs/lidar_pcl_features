@@ -2,7 +2,7 @@ import os
 import shutil
 from functools import cached_property, lru_cache
 from pathlib import Path
-from typing import Dict, Literal, NamedTuple, Tuple, Union
+from typing import Dict, List, Literal, NamedTuple, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -28,12 +28,14 @@ class Dataset:
         self,
         data_folder: Path,
         idx_to_cls: Dict[int, Annotation],
+        feature_scales: List[float],
         data_pattern: str = '*.xyz_label_conf',
         cache_dir: Path = PROJ_ROOT / '.dataset_cache',
         drop_cache: bool = False,
     ):
         self.data_folder = data_folder
         self.idx_to_cls = idx_to_cls
+        self.feature_scales = feature_scales
         self.drop_cache = drop_cache
         self.data_pattern = data_pattern
         self.cache_dir = cache_dir
@@ -79,13 +81,16 @@ class Dataset:
         if isinstance(scene, str):
             scene = self._get_scene_by_name(scene, subset)
         subset_cache = self.cache_dir / subset
-        file_path = subset_cache / f'{scene.name}.npy'
-        if file_path.is_file():
-            scene_features = np.load(str(file_path))
-        else:
-            scene_features = get_features(scene.points[:, :3])
-            np.save(str(file_path), scene_features)
-        return scene_features
+        scale_features: List[NDArray[float]] = []
+        for scale in self.feature_scales:
+            file_path = subset_cache / f'scale_{str(scale)}' / f'{scene.name}.npy'
+            os.makedirs(file_path.parent, exist_ok=True)
+            if file_path.is_file():
+                scale_features.append(np.load(str(file_path)))
+            else:
+                scale_features.append(get_features(scene.points[:, :3], scale))
+                np.save(str(file_path), scale_features[-1])
+        return np.hstack([ft[0] if ft.ndim == 3 else ft for ft in scale_features])
 
     @lru_cache
     def get_classes(self, subset: Literal['training', 'testing']) -> NDArray[float]:
