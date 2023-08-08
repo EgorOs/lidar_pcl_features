@@ -10,12 +10,11 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils import class_weight
 from xgboost import XGBClassifier
 
-from src.annotations import Annotation
+from src.annotations import Annotation, read_class_mapping
 from src.config import ExperimentConfig
 from src.constants import PROJ_ROOT
 from src.dataset import TESTING_SET, TRAINING_SET, Dataset
 from src.experiment_tracking import log_point_cloud
-from src.utils import read_class_mapping
 
 
 def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
@@ -31,7 +30,7 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     task.connect_configuration(configuration=cfg.model_dump())
 
     data_path = Path(ClearmlDataset.get(dataset_name=cfg.data_config.dataset_name).get_local_copy())
-    dataset = Dataset(data_path, idx_to_class, feature_scales=[3, 6], drop_cache=cfg.data_config.drop_cache)
+    dataset = Dataset(data_path, idx_to_class, feature_scales=[1.5, 3, 6, 8], drop_cache=cfg.data_config.drop_cache)
     dataset.prepare()
 
     train_features = dataset.get_features(TESTING_SET)  # Test / train are switched intentionally.
@@ -46,7 +45,7 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     classes_weights = list(
         class_weight.compute_class_weight('balanced', classes=np.unique(train_classes), y=train_classes),
     )
-    bst.fit(train_features, train_classes, sample_weight=[classes_weights[cls] for cls in train_classes])
+    bst.fit(train_features, train_classes, sample_weight=[classes_weights[cls_name] for cls_name in train_classes])
     preds = bst.predict(test_features)
 
     cf_matrix = confusion_matrix(test_classes, preds)

@@ -8,10 +8,13 @@ import numpy as np
 from numpy.typing import NDArray
 from tqdm import tqdm
 
-from src.annotations import Annotation
+from src.annotations import Annotation, apply_class_mapping, remap_class_indexes
 from src.constants import PROJ_ROOT
 from src.features import get_features
-from src.utils import apply_class_mapping, remap_class_indexes
+
+DEFAULT_DATA_CACHE_PATH = PROJ_ROOT / '.dataset_cache'
+
+INF_REPLACEMENT = 1e12
 
 
 class Scene(NamedTuple):
@@ -23,14 +26,14 @@ TRAINING_SET = 'training'
 TESTING_SET = 'testing'
 
 
-class Dataset:
+class Dataset:  # noqa: WPS214
     def __init__(
         self,
         data_folder: Path,
         idx_to_cls: Dict[int, Annotation],
         feature_scales: List[float],
         data_pattern: str = '*.xyz_label_conf',
-        cache_dir: Path = PROJ_ROOT / '.dataset_cache',
+        cache_dir: Path = DEFAULT_DATA_CACHE_PATH,
         drop_cache: bool = False,
     ):
         self.data_folder = data_folder
@@ -45,8 +48,8 @@ class Dataset:
         if self.drop_cache:
             shutil.rmtree(self.cache_dir)
         all_scenes = list(self.get_scenes(TRAINING_SET)) + list(self.get_scenes(TESTING_SET))
-        classes = np.hstack([sc.points[:, 3] for sc in all_scenes]).astype(np.int32)
-        self._idx_to_new_idx = remap_class_indexes(classes)
+        classes = np.hstack([sc.points[:, 3] for sc in all_scenes])
+        self._idx_to_new_idx = remap_class_indexes(classes.astype(np.int32))
 
     @cached_property
     def idx_to_class_name(self) -> Dict[int, str]:
@@ -59,7 +62,9 @@ class Dataset:
     @cached_property
     def idx_to_color(self) -> Dict[int, str]:
         return {
-            self._idx_to_new_idx[idx]: ann.color for idx, ann in self.idx_to_cls.items() if idx in self._idx_to_new_idx
+            self._idx_to_new_idx[idx]: ann.color
+            for idx, ann in self.idx_to_cls.items()  # noqa: WPS221
+            if idx in self._idx_to_new_idx
         }
 
     @lru_cache
@@ -83,7 +88,7 @@ class Dataset:
         subset_cache = self.cache_dir / subset
         scale_features: List[NDArray[float]] = []
         for scale in self.feature_scales:
-            file_path = subset_cache / f'scale_{str(scale)}' / f'{scene.name}.npy'
+            file_path = subset_cache / 'scale_{0}'.format(str(scale)) / '{0}.npy'.format(scene.name)
             os.makedirs(file_path.parent, exist_ok=True)
             if file_path.is_file():
                 scale_features.append(np.load(str(file_path)))
@@ -103,17 +108,16 @@ class Dataset:
         classes = np.hstack([scene.points[:, 3]])
         return apply_class_mapping(classes, self._idx_to_new_idx)
 
+    def get_scene_points(self, subset: Literal['training', 'testing'], scene_name: str) -> NDArray[float]:
+        scene = self._get_scene_by_name(scene_name, subset)
+        return scene.points
+
     def _get_scene_by_name(self, scene_name, subset):
         scene = next((sc for sc in self.get_scenes(subset) if sc.name == scene_name), None)
         if scene is None:
             raise ValueError('Could not find scene {0}'.format(scene_name))
         return scene
 
-    def get_scene_points(self, subset: Literal['training', 'testing'], scene_name: str) -> NDArray[float]:
-        scene = self._get_scene_by_name(scene_name, subset)
-        return scene.points
-
 
 def _post_process_features(features: NDArray[float]) -> NDArray[float]:
-    features = np.nan_to_num(features, posinf=1e12, neginf=-1e12)
-    return features
+    return np.nan_to_num(features, posinf=INF_REPLACEMENT, neginf=-INF_REPLACEMENT)

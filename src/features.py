@@ -1,7 +1,6 @@
 import math
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import List
 
 import numpy as np
 import open3d as o3d
@@ -10,7 +9,7 @@ from tqdm import tqdm
 
 
 @dataclass
-class LocalPCD:
+class LocalPCD:  # noqa: WPS214
     pcd: o3d.geometry.PointCloud = field(default_factory=o3d.geometry.PointCloud)
 
     @classmethod
@@ -22,47 +21,47 @@ class LocalPCD:
         return cls(local_pcd)
 
     @cached_property
-    def cov_eig(self):
+    def cov_eigvals(self) -> NDArray[float]:
         cov = self.pcd.compute_mean_and_covariance()[1]
-        return np.linalg.eig(cov)
+        return np.linalg.eig(cov)[0]
 
     @cached_property
     def feat_linearity(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return (e1 - e2) / e1
 
     @cached_property
     def feat_planarity(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return (e2 - e3) / e1
 
     @cached_property
     def feat_scattering(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return e3 / e1
 
     @cached_property
     def feat_omnivariance(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return math.pow((e1 * e2 * e3), 1 / 3)
 
     @cached_property
     def feat_anisotropy(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return (e1 - e3) / e1
 
     @cached_property
     def feat_eigentropy(self) -> float:
-        eigen_vals = self.cov_eig[0]
+        eigen_vals = self.cov_eigvals
         return -np.sum(eigen_vals * np.log(eigen_vals))
 
     @cached_property
     def feat_eigensum(self) -> float:
-        return np.sum(self.cov_eig[0])
+        return np.sum(self.cov_eigvals)
 
     @cached_property
     def feat_change_in_curvature(self) -> float:
-        e1, e2, e3 = self.cov_eig[0]
+        e1, e2, e3 = self.cov_eigvals
         return e3 / (e1 + e2 + e3)
 
     @cached_property
@@ -81,16 +80,15 @@ class LocalPCD:
         )
 
 
-def get_features(points_3d: NDArray[float], scale: float) -> NDArray[float]:
+def get_features(points3d: NDArray[float], scale: float) -> NDArray[float]:
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(points_3d[:, :3])
+    pcd.points = o3d.utility.Vector3dVector(points3d[:, :3])
     pcd_tree = o3d.geometry.KDTreeFlann(pcd)
 
     features = []
     # TODO: Use multiprocessing
     for pt3d in tqdm(pcd.points, desc=f'Calculating features for 3D points at scale {scale}:'):
-        kn, idx, *_ = pcd_tree.search_radius_vector_3d(pt3d, scale)
-        local_pcd = LocalPCD.from_pt_and_neighbours(pcd, pt3d, idx)
-        features.append(local_pcd.features)
+        idx = pcd_tree.search_radius_vector_3d(pt3d, scale)[1]
+        features.append(LocalPCD.from_pt_and_neighbours(pcd, pt3d, idx).features)
 
     return np.vstack(features)
