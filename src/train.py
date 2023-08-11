@@ -5,7 +5,7 @@ import lightning
 import numpy as np
 from clearml import OutputModel, Task
 from clearml.datasets import Dataset as ClearmlDataset
-from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import RandomOverSampler
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils import class_weight
 from xgboost import XGBClassifier
@@ -36,7 +36,7 @@ def train(cfg: ExperimentConfig, idx_to_class: Dict[int, Annotation]):
     train_features = dataset.get_features(TESTING_SET)  # Test / train are switched intentionally.
     train_classes = dataset.get_classes(TESTING_SET)
 
-    sampler = RandomUnderSampler()
+    sampler = RandomOverSampler()
     train_features, train_classes = sampler.fit_resample(train_features, train_classes)
     test_features = dataset.get_features(TRAINING_SET)
     test_classes = dataset.get_classes(TRAINING_SET)

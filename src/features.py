@@ -23,7 +23,8 @@ class LocalPCD:  # noqa: WPS214
     @cached_property
     def cov_eigvals(self) -> NDArray[float]:
         cov = self.pcd.compute_mean_and_covariance()[1]
-        return np.linalg.eig(cov)[0]
+        # Expected to have e1 >= e2 >= e3
+        return np.array(sorted(np.linalg.eig(cov)[0], reverse=True))
 
     @cached_property
     def feat_linearity(self) -> float:
