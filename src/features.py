@@ -44,7 +44,7 @@ class LocalPCD:  # noqa: WPS214
     @cached_property
     def feat_omnivariance(self) -> float:
         e1, e2, e3 = self.cov_eigvals
-        return math.pow((e1 * e2 * e3), 1 / 3)
+        return math.pow(abs(e1 * e2 * e3), 1 / 3)
 
     @cached_property
     def feat_anisotropy(self) -> float:
@@ -72,7 +72,7 @@ class LocalPCD:  # noqa: WPS214
                 self.feat_linearity,
                 self.feat_planarity,
                 self.feat_scattering,
-                # self.feat_omnivariance,  # FIXME: sqrt of negative number?
+                self.feat_omnivariance,
                 self.feat_anisotropy,
                 self.feat_eigentropy,
                 self.feat_eigensum,
